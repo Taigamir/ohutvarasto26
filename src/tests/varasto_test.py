@@ -39,19 +39,19 @@ class TestVarasto(unittest.TestCase):
     def test_lisays_lisaa_ei_vie_tilavuutta_negatiiviseksi(self):
         self.varasto.lisaa_varastoon(11)
 
-        self.assertAlmostEqual(self.varasto.paljonko_mahtuu(), -1)
+        self.assertAlmostEqual(self.varasto.paljonko_mahtuu(), 0)
 
     def test_lisays_ei_lisaa_negatiivista_maaraa(self):
         self.varasto.lisaa_varastoon(-1)
 
-        self.assertAlmostEqual(self.varasto.paljonko_mahtuu(), 9)
+        self.assertAlmostEqual(self.varasto.paljonko_mahtuu(), 10)
 
     def test_ottaminen_ei_ota_negatiivista_maaraa(self):
         self.varasto.lisaa_varastoon(8)
 
         self.varasto.ota_varastosta(-1)
 
-        self.assertAlmostEqual(self.varasto.paljonko_mahtuu(), 9)
+        self.assertAlmostEqual(self.varasto.paljonko_mahtuu(), 2)
 
     def test_ottaminen_palauttaa_oikean_maaran(self):
         self.varasto.lisaa_varastoon(8)
@@ -73,7 +73,7 @@ class TestVarasto(unittest.TestCase):
 
         self.varasto.ota_varastosta(9)
 
-        self.assertAlmostEqual(self.varasto.paljonko_mahtuu(), 11)
+        self.assertAlmostEqual(self.varasto.paljonko_mahtuu(), 10)
 
     def test_tulos_printtaa_oikein(self):
         self.varasto.lisaa_varastoon(8)
