@@ -17,6 +17,8 @@ class Varasto:
         """calculate max capacity"""
         return self.tilavuus - self.saldo
 
+    #comment to test new github actions
+
     def lisaa_varastoon(self, maara):
         """Add into class"""
         if maara < 0:
