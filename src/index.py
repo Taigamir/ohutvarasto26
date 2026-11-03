@@ -1,7 +1,9 @@
+"""Main module to run funktion"""
 from varasto import Varasto
 
 
 def main():
+    """Runs function with entered contents"""
     mehua = Varasto(100.0)
     olutta = Varasto(100.0, 20.2)
 

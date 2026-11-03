@@ -1,5 +1,9 @@
+"""Contains definition for class Varasto"""
+
 class Varasto:
+    """Create class varasto"""
     def __init__(self, tilavuus, alku_saldo = 0):
+        """Init the class"""
         if tilavuus > 0.0:
             self.tilavuus = tilavuus
         else:
@@ -18,9 +22,11 @@ class Varasto:
 
     # huom: ominaisuus voidaan myös laskea. Ei tarvita erillistä kenttää viela_tilaa tms.
     def paljonko_mahtuu(self):
+        """calculate max capacity"""
         return self.tilavuus - self.saldo
 
     def lisaa_varastoon(self, maara):
+        """Add into class"""
         if maara < 0:
             return
         if maara <= self.paljonko_mahtuu():
@@ -29,6 +35,7 @@ class Varasto:
             self.saldo = self.tilavuus
 
     def ota_varastosta(self, maara):
+        """Take from class"""
         if maara < 0:
             return 0.0
         if maara > self.saldo:
@@ -42,4 +49,5 @@ class Varasto:
         return maara
 
     def __str__(self):
+        """Format string print"""
         return f"saldo = {self.saldo}, vielä tilaa {self.paljonko_mahtuu()}"
