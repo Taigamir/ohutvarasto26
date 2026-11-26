@@ -25,10 +25,12 @@ class TestWarehouseWeb(unittest.TestCase):
         self.thread.join()
 
     def get_page(self):
+        """Return the rendered warehouse page."""
         with urlopen(self.url) as response:
             return response.read().decode("utf-8")
 
     def submit(self, **fields):
+        """Submit a form and return the page after its redirect."""
         request = Request(
             self.url,
             data=urlencode(fields).encode("utf-8"),
@@ -37,39 +39,62 @@ class TestWarehouseWeb(unittest.TestCase):
         with urlopen(request) as response:
             return response.read().decode("utf-8")
 
-    def test_create_warehouses_and_manage_stock(self):
-        self.submit(action="create", name="Mehu", capacity="10")
-        self.submit(action="create", name="Olut", capacity="20")
-        page = self.get_page()
-        self.assertIn("Mehu", page)
-        self.assertIn("Olut", page)
+    def create_warehouse(self, name, capacity):
+        """Create a warehouse with the provided details."""
+        return self.submit(action="create", name=name, capacity=capacity)
 
-        self.submit(
-            action="add", warehouse_id="1", amount="8"
+    def update_stock(self, action, warehouse_id, amount):
+        """Submit a stock change for one warehouse."""
+        return self.submit(
+            action=action, warehouse_id=warehouse_id, amount=amount
         )
-        page = self.submit(
-            action="take", warehouse_id="1", amount="3"
+
+    def assert_balance(self, page, balance, capacity):
+        """Check that the page shows a warehouse's balance and capacity."""
+        normalized_page = " ".join(page.split())
+        self.assertIn(
+            f"Saldo: <strong>{balance}</strong> / {capacity} litraa",
+            normalized_page,
         )
-        self.assertIn("Saldo: <strong>5</strong> /", page)
-        self.assertIn("Varastosta Mehu otettiin 3.", page)
-        self.assertIn("Saldo: <strong>0</strong> / 20 litraa", page)
+
+    def assert_balances(self, page, *balances):
+        """Check multiple warehouse balances on a single page."""
+        for balance, capacity in balances:
+            self.assert_balance(page, balance, capacity)
+
+    def assert_message(self, page, message):
+        """Check that the page displays the expected feedback."""
+        self.assertIn(message, page)
+
+    def test_create_warehouses_and_manage_stock(self):
+        """Create multiple warehouses, then add and withdraw goods."""
+        self.create_warehouse("Mehu", "10")
+        self.create_warehouse("Olut", "20")
+        page = self.get_page()
+        self.assert_balances(page, ("0", "10"), ("0", "20"))
+
+        self.update_stock("add", "1", "8")
+        page = self.update_stock("take", "1", "3")
+        self.assert_balance(page, "5", "10")
+        self.assert_message(page, "Varastosta Mehu otettiin 3.")
+        self.assert_balance(page, "0", "20")
 
     def test_reject_invalid_warehouse_and_stock_values(self):
-        page = self.submit(action="create", name="Tyhjä", capacity="0")
-        self.assertIn("Anna varastolle nimi ja positiivinen tilavuus.", page)
+        """Reject invalid capacity and non-finite stock values."""
+        page = self.create_warehouse("Tyhjä", "0")
+        self.assert_message(
+            page, "Anna varastolle nimi ja positiivinen tilavuus."
+        )
         self.assertNotIn("Tyhjä</h2>", page)
 
-        self.submit(action="create", name="Varasto", capacity="10")
-        page = self.submit(
-            action="add", warehouse_id="1", amount="nan"
-        )
-        self.assertIn("Tarkista varasto ja määrä.", page)
-        self.assertIn("Saldo: <strong>0</strong> / 10 litraa", page)
+        self.create_warehouse("Varasto", "10")
+        page = self.update_stock("add", "1", "nan")
+        self.assert_message(page, "Tarkista varasto ja määrä.")
+        self.assert_balance(page, "0", "10")
 
     def test_warehouse_names_are_escaped(self):
-        self.submit(
-            action="create", name="<script>alert(1)</script>", capacity="10"
-        )
+        """Escape warehouse names before inserting them into HTML."""
+        self.create_warehouse("<script>alert(1)</script>", "10")
         page = self.get_page()
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", page)
         self.assertNotIn("<script>alert(1)</script>", page)

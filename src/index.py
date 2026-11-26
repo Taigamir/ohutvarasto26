@@ -20,6 +20,8 @@ class WarehouseServer(ThreadingHTTPServer):
 class WarehouseHandler(BaseHTTPRequestHandler):
     """Serve the warehouse list and handle warehouse and stock forms."""
 
+    # These names are required by BaseHTTPRequestHandler's dispatch mechanism.
+    # pylint: disable=invalid-name
     def do_GET(self):
         """Render the warehouse page."""
         message = parse_qs(urlsplit(self.path).query).get("message", [""])[0]
@@ -32,15 +34,23 @@ class WarehouseHandler(BaseHTTPRequestHandler):
             self.send_error(413, "Request body too large")
             return
 
-        form = parse_qs(self.rfile.read(content_length).decode("utf-8"))
+        try:
+            body = self.rfile.read(content_length).decode("utf-8")
+        except UnicodeDecodeError:
+            self.send_error(400, "Invalid form encoding")
+            return
+        form = parse_qs(body)
+        self._redirect_with_message(self._message_for_form(form))
+
+    def _message_for_form(self, form):
         action = form.get("action", [""])[0]
         if action == "create":
-            message = self._create_warehouse(form)
-        elif action in ("add", "take"):
-            message = self._update_stock(action, form)
-        else:
-            message = "Tuntematon toiminto."
+            return self._create_warehouse(form)
+        if action in ("add", "take"):
+            return self._update_stock(action, form)
+        return "Tuntematon toiminto."
 
+    def _redirect_with_message(self, message):
         self.send_response(303)
         self.send_header("Location", f"/?{urlencode({'message': message})}")
         self.end_headers()
@@ -81,44 +91,21 @@ class WarehouseHandler(BaseHTTPRequestHandler):
         return number if isfinite(number) else None
 
     def _send_page(self, message=""):
-        warehouse_cards = []
-        for warehouse_id, (name, inventory) in self.server.warehouses.items():
-            safe_name = escape(name)
-            warehouse_cards.append(
-                f"""
-                <article class="warehouse">
-                  <h2>{safe_name}</h2>
-                  <p>Saldo: <strong>{inventory.saldo:g}</strong> /
-                     {inventory.tilavuus:g} litraa</p>
-                  <p>Vapaata tilaa: {inventory.paljonko_mahtuu():g} litraa</p>
-                  <div class="actions">
-                    <form method="post">
-                      <input type="hidden" name="action" value="add">
-                      <input type="hidden" name="warehouse_id"
-                             value="{warehouse_id}">
-                      <label>Lisää (l)
-                        <input type="number" name="amount" min="0"
-                               step="any" required>
-                      </label>
-                      <button type="submit">Lisää tavaraa</button>
-                    </form>
-                    <form method="post">
-                      <input type="hidden" name="action" value="take">
-                      <input type="hidden" name="warehouse_id"
-                             value="{warehouse_id}">
-                      <label>Ota (l)
-                        <input type="number" name="amount" min="0"
-                               step="any" required>
-                      </label>
-                      <button type="submit">Ota tavaraa</button>
-                    </form>
-                  </div>
-                </article>
-                """
-            )
-        cards = "".join(warehouse_cards) or "<p>Varastoja ei ole vielä.</p>"
+        body = self._page_html(message).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _page_html(self, message):
+        cards = "".join(
+            self._warehouse_card(warehouse_id, name, inventory)
+            for warehouse_id, (name, inventory)
+            in self.server.warehouses.items()
+        ) or "<p>Varastoja ei ole vielä.</p>"
         safe_message = escape(message)
-        page = f"""<!doctype html>
+        return f"""<!doctype html>
 <html lang="fi">
   <head>
     <meta charset="utf-8">
@@ -160,12 +147,40 @@ class WarehouseHandler(BaseHTTPRequestHandler):
     </section>
   </body>
 </html>"""
-        body = page.encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+
+    @staticmethod
+    def _warehouse_card(warehouse_id, name, inventory):
+        safe_name = escape(name)
+        return f"""
+                <article class="warehouse">
+                  <h2>{safe_name}</h2>
+                  <p>Saldo: <strong>{inventory.saldo:g}</strong> /
+                     {inventory.tilavuus:g} litraa</p>
+                  <p>Vapaata tilaa: {inventory.paljonko_mahtuu():g} litraa</p>
+                  <div class="actions">
+                    <form method="post">
+                      <input type="hidden" name="action" value="add">
+                      <input type="hidden" name="warehouse_id"
+                             value="{warehouse_id}">
+                      <label>Lisää (l)
+                        <input type="number" name="amount" min="0"
+                               step="any" required>
+                      </label>
+                      <button type="submit">Lisää tavaraa</button>
+                    </form>
+                    <form method="post">
+                      <input type="hidden" name="action" value="take">
+                      <input type="hidden" name="warehouse_id"
+                             value="{warehouse_id}">
+                      <label>Ota (l)
+                        <input type="number" name="amount" min="0"
+                               step="any" required>
+                      </label>
+                      <button type="submit">Ota tavaraa</button>
+                    </form>
+                  </div>
+                </article>
+                """
 
 
 def main():
