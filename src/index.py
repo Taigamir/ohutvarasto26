@@ -20,6 +20,8 @@ class WarehouseServer(ThreadingHTTPServer):
 class WarehouseHandler(BaseHTTPRequestHandler):
     """Serve the warehouse list and handle warehouse and stock forms."""
 
+    server: WarehouseServer
+
     # These names are required by BaseHTTPRequestHandler's dispatch mechanism.
     # pylint: disable=invalid-name
     def do_GET(self):
